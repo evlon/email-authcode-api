@@ -1,0 +1,12 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "email-authcode-api"
+main = "src/index.js"
+compatibility_date = "2024-09-26"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+
+[vars]
+DEBUG = false
+ALLOWED_SENDERS = ["@notify.cloudflare.com"]
+ 
+ 
