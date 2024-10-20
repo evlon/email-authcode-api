@@ -1,5 +1,3 @@
-'use strict';
-
 const textEncoder = new TextEncoder();
 
 const decoders = new Map();
@@ -4158,4 +4156,4 @@ const export_default = {
 
 console.log(export_default);
 
-module.exports = export_default;
+export { export_default as default };
