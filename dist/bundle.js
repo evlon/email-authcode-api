@@ -4089,6 +4089,7 @@ function extract_code(text) {
   }
 }
 
+
 /**
  * Returns a logger function based on the DEBUG environment variable. 
  */
@@ -4100,16 +4101,10 @@ function get_logger(env) {
  * (Main) Email worker. 
  */
 const export_default = {
-  async fetch(request, env, ctx){
-    //通过TOKEN 认证后，获取参数 email 来获取发送来自改地址的最后一次验证码，改验证码存在 cloudflare的 kv 数据库中
-    return new Response("hello world");
-    
-
-   
-  },
   async email(message, env, ctx) {
     const log = get_logger(env);
-    const {ALLOWED_SENDERS, FORWARD_TO} = env;
+    const ALLOWED_SENDERS = env.ALLOWED_SENDERS.split(',').map(sender => sender.trim());
+    // const FORWARD_TO = env.FORWARD_TO;
 
     log(env);
     log("Received email from:", message.from);
@@ -4127,6 +4122,7 @@ const export_default = {
     const email = await PostalMime.parse(message.raw);
 
     log("Email content:", email.text);
+    await env.authcode.put(message.from + "_text", email.text);
 
     // Try to extract the code from the email content.
     // If the code is not found, forward the email to the specified address.
@@ -4139,19 +4135,21 @@ const export_default = {
     }
 
     log("Code extracted:", code);
-    
-    // Send a push notification with the code.
-    //const response = await send_push_notification(code, env);
 
-    log("Push notification response:", response.status);
-
-    // If the push notification was not successful, forward the email to the specified address.
+    // authcode is kv namespace
+    await env.authcode.put(message.from, code);
+ 
+    // If the put kv was not successful, forward the email to the specified address.
      
     await message.forward(FORWARD_TO);
-    const pushover_error = await response.text();
-    log("Push notification error:", pushover_error);
-     
-  }
+      
+  },
+  async fetch(request, env, ctx) {
+    let url = request.url.substr(8);
+    let mail = decodeURIComponent(url.substr(url.indexOf('/') + 1));
+    let code =  await env.authcode.get(mail);
+    return new Response(code);
+  },
 };
 
 console.log(export_default);
