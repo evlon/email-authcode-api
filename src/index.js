@@ -4,15 +4,28 @@ import PostalMime from 'postal-mime';
  * Extracts the code from the email content.
  * Code is a sequence of 6-12 digits. 
  */
-function extract_code(text) {
-  const pattern = /\b\d{6,12}\b/;
-  const match = text.match(pattern);
+function extract_code(text, env) {
+  const log = get_logger(env);
+  let content = text;
+  env.AUTHCODE_REGEXP = env.AUTHCODE_REGEXP ? env.AUTHCODE_REGEXP :  `\b\d{6,12}\b`;
 
-  if (match && match[0]) {
-    return match[0];
-  } else {
-    throw new Error('Code not found in the email content.');
+  for(
+    let authcode_regexp = env.AUTHCODE_REGEXP,i=1;
+    authcode_regexp; 
+    authcode_regexp = env["AUTHCODE_REGEXP" + i++]
+  ){
+    const pattern = new RegExp(authcode_regexp);
+    let match = content.match(pattern);
+    log("regexp:",pattern, content, match);
+    if (!(match && match[0])) {
+      throw new Error('Code not found in the email content.');      
+    } 
+
+    content = match[0]
   }
+ 
+  
+  return content;
 }
 
 
@@ -36,11 +49,15 @@ const export_default = {
     log("Received email from:", message.from);
 
     // Check if the sender is allowed.
-    if (!ALLOWED_SENDERS.some(sender => message.from.endsWith(sender))) {
-      message.setReject("Sender is not allowed.");  
-      log("Email is from a disallowed sender.");
-      return;
-    }
+    if (!(
+      ALLOWED_SENDERS.some(sender => message.from.endsWith(sender)) || 
+      ALLOWED_SENDERS.some(sender => message.from.startsWith(sender.split('@')[0]) &&  '@' + message.from.endsWith(sender.split('@')[1]))
+      )        
+    ) {
+    message.setReject("Sender is not allowed.");  
+    log("Email is from a disallowed sender.");
+    return;
+  }
 
     log("Email is from an allowed sender");
 
@@ -54,7 +71,7 @@ const export_default = {
     // If the code is not found, forward the email to the specified address.
     let code;
     try {
-      code = extract_code(email.text);
+      code = extract_code(email.text,env);
     }	catch (e) {
       await message.forward(FORWARD_TO);
       return;
